@@ -10,6 +10,8 @@ private enum SheetDestination: String, Identifiable {
 
 @MainActor
 struct ControllerShellView: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     let controller: ATEMController
 
     @State private var presentedSheet: SheetDestination?
@@ -20,21 +22,30 @@ struct ControllerShellView: View {
                 .ignoresSafeArea()
 
             GeometryReader { geometry in
+                let usesCompactLayout = geometry.size.width < 700
+                    || dynamicTypeSize.isAccessibilitySize
+
                 ScrollView {
-                    VStack(spacing: 18) {
-                        header
+                    VStack(spacing: usesCompactLayout ? 12 : 18) {
+                        header(usesCompactLayout: usesCompactLayout)
                         if let errorMessage = controller.errorMessage {
                             errorBanner(errorMessage)
                         }
-                        SwitcherControlView(controller: controller)
+                        SwitcherControlView(
+                            controller: controller,
+                            usesCompactLayout: usesCompactLayout
+                        )
                             .frame(maxHeight: .infinity)
                     }
                     .frame(
                         maxWidth: 1180,
-                        minHeight: max(geometry.size.height - 44, 0)
+                        minHeight: max(
+                            geometry.size.height - (usesCompactLayout ? 24 : 44),
+                            0
+                        )
                     )
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 22)
+                    .padding(.horizontal, usesCompactLayout ? 12 : 24)
+                    .padding(.vertical, usesCompactLayout ? 12 : 22)
                     .frame(maxWidth: .infinity)
                 }
                 .scrollBounceBehavior(.basedOnSize)
@@ -51,15 +62,26 @@ struct ControllerShellView: View {
         }
     }
 
-    private var header: some View {
-        HStack(spacing: 14) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("ATEM Mini")
-                    .font(.title.bold())
-                Text(controller.host)
-                    .font(.subheadline.monospaced())
-                    .foregroundStyle(.secondary)
+    private func header(usesCompactLayout: Bool) -> some View {
+        Group {
+            if usesCompactLayout {
+                compactHeader
+            } else {
+                regularHeader
             }
+        }
+        .padding(.horizontal, usesCompactLayout ? 16 : 20)
+        .padding(.vertical, usesCompactLayout ? 14 : 16)
+        .background(.background, in: RoundedRectangle(cornerRadius: 20))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20)
+                .strokeBorder(.primary.opacity(0.07), lineWidth: 1)
+        }
+    }
+
+    private var regularHeader: some View {
+        HStack(spacing: 14) {
+            controllerIdentity
 
             Spacer(minLength: 12)
 
@@ -70,31 +92,50 @@ struct ControllerShellView: View {
                     .controlSize(.large)
             }
 
-            connectionButton
+            connectionButton(expands: false)
 
-            Button {
-                presentedSheet = .settings
-            } label: {
-                Label("Settings", systemImage: "gearshape.fill")
-                    .labelStyle(.iconOnly)
-                    .font(.title2)
-                    .frame(width: 52, height: 52)
-            }
-            .buttonStyle(.bordered)
-            .buttonBorderShape(.circle)
-            .accessibilityIdentifier("settingsButton")
+            settingsButton
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
-        .background(.background, in: RoundedRectangle(cornerRadius: 20))
-        .overlay {
-            RoundedRectangle(cornerRadius: 20)
-                .strokeBorder(.primary.opacity(0.07), lineWidth: 1)
+    }
+
+    private var compactHeader: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                controllerIdentity
+
+                Spacer(minLength: 8)
+
+                settingsButton
+            }
+
+            HStack(spacing: 12) {
+                statusLabel
+
+                if controller.isBusy {
+                    ProgressView()
+                        .controlSize(.large)
+                }
+
+                Spacer(minLength: 0)
+            }
+
+            connectionButton(expands: true)
+        }
+    }
+
+    private var controllerIdentity: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("ATEM Mini")
+                .font(.title.bold())
+            Text(controller.host)
+                .font(.subheadline.monospaced())
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
         }
     }
 
     @ViewBuilder
-    private var connectionButton: some View {
+    private func connectionButton(expands: Bool) -> some View {
         if controller.isConnected || controller.isBusy {
             Button {
                 controller.disconnect()
@@ -103,6 +144,7 @@ struct ControllerShellView: View {
                     controller.isBusy ? "Cancel" : "Disconnect",
                     systemImage: "stop.fill"
                 )
+                .frame(maxWidth: expands ? .infinity : nil)
             }
             .buttonStyle(.bordered)
             .controlSize(.large)
@@ -112,11 +154,26 @@ struct ControllerShellView: View {
                 controller.connect()
             } label: {
                 Label("Connect", systemImage: "bolt.horizontal.fill")
+                    .frame(maxWidth: expands ? .infinity : nil)
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
             .accessibilityIdentifier("connectionButton")
         }
+    }
+
+    private var settingsButton: some View {
+        Button {
+            presentedSheet = .settings
+        } label: {
+            Label("Settings", systemImage: "gearshape.fill")
+                .labelStyle(.iconOnly)
+                .font(.title2)
+                .frame(width: 52, height: 52)
+        }
+        .buttonStyle(.bordered)
+        .buttonBorderShape(.circle)
+        .accessibilityIdentifier("settingsButton")
     }
 
     private var statusLabel: some View {

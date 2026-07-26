@@ -4,9 +4,10 @@ import SwiftUI
 @MainActor
 struct SwitcherControlView: View {
     let controller: ATEMController
+    let usesCompactLayout: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 22) {
+        VStack(alignment: .leading, spacing: usesCompactLayout ? 18 : 22) {
             busHeader
 
             ViewThatFits(in: .horizontal) {
@@ -16,44 +17,80 @@ struct SwitcherControlView: View {
             }
             .frame(maxHeight: .infinity)
         }
-        .padding(24)
+        .padding(usesCompactLayout ? 16 : 24)
         .frame(maxHeight: .infinity, alignment: .top)
-        .background(.background, in: RoundedRectangle(cornerRadius: 24))
+        .background(
+            .background,
+            in: RoundedRectangle(cornerRadius: usesCompactLayout ? 20 : 24)
+        )
         .overlay {
-            RoundedRectangle(cornerRadius: 24)
+            RoundedRectangle(cornerRadius: usesCompactLayout ? 20 : 24)
                 .strokeBorder(.primary.opacity(0.07), lineWidth: 1)
         }
     }
 
     private var busHeader: some View {
-        HStack(spacing: 16) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Switcher")
-                    .font(.title2.bold())
-                Text("Tap a source to stage it")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 16) {
+                switcherTitle
+
+                Spacer(minLength: 16)
+
+                tallyStatuses
             }
+            .frame(minWidth: 620)
 
-            Spacer(minLength: 16)
-
-            TallyStatus(
-                title: "Program",
-                sourceName: controller.snapshot.programSource?.displayName ?? "—",
-                color: .red
-            )
-            TallyStatus(
-                title: controller.snapshot.transition.isInTransition
-                    ? "Transition"
-                    : "Preview",
-                sourceName: controller.snapshot.previewSource?.displayName ?? "—",
-                color: controller.snapshot.transition.isInTransition ? .red : .green
-            )
+            VStack(alignment: .leading, spacing: 14) {
+                switcherTitle
+                tallyStatuses
+            }
         }
     }
 
+    private var switcherTitle: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text("Switcher")
+                .font(.title2.bold())
+            Text("Tap a source to stage it")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var tallyStatuses: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                programTally
+                previewTally
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                programTally
+                previewTally
+            }
+        }
+    }
+
+    private var programTally: some View {
+        TallyStatus(
+            title: "Program",
+            sourceName: controller.snapshot.programSource?.displayName ?? "—",
+            color: .red
+        )
+    }
+
+    private var previewTally: some View {
+        TallyStatus(
+            title: controller.snapshot.transition.isInTransition
+                ? "Transition"
+                : "Preview",
+            sourceName: controller.snapshot.previewSource?.displayName ?? "—",
+            color: controller.snapshot.transition.isInTransition ? .red : .green
+        )
+    }
+
     private var wideControlLayout: some View {
-        HStack(alignment: .top, spacing: 24) {
+        HStack(spacing: 16) {
             sourceControls
 
             Divider()
@@ -68,7 +105,11 @@ struct SwitcherControlView: View {
         VStack(alignment: .leading, spacing: 20) {
             sourceControls
             Divider()
-            takeControls(axis: .horizontal)
+            ViewThatFits(in: .horizontal) {
+                takeControls(axis: .horizontal)
+                    .frame(minWidth: 440)
+                takeControls(axis: .vertical)
+            }
         }
     }
 
@@ -76,38 +117,66 @@ struct SwitcherControlView: View {
         VStack(alignment: .leading, spacing: 12) {
             SectionLabel("Stage")
 
-            HStack(spacing: 14) {
-                ForEach(UInt16(1)...UInt16(4), id: \.self) { input in
-                    SourceButton(
-                        title: String(input),
-                        neutralLabel: "Input",
-                        light: light(for: input),
-                        isPending: controller.pendingPreviewInput == input,
-                        isEnabled: controller.isConnected,
-                        accessibilityLabel: "Input \(input)",
-                        accessibilityIdentifier: "input\(input)Button"
-                    ) {
-                        controller.selectPreviewInput(input)
+            ViewThatFits(in: .horizontal) {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 14) {
+                        ForEach(UInt16(1)...UInt16(4), id: \.self) { input in
+                            inputButton(input)
+                        }
                     }
+
+                    blackButton(isCompact: true)
+                        .frame(maxWidth: 196)
+                }
+                .frame(minWidth: 560)
+
+                LazyVGrid(
+                    columns: [
+                        GridItem(.flexible(), spacing: 12),
+                        GridItem(.flexible())
+                    ],
+                    alignment: .leading,
+                    spacing: 12
+                ) {
+                    ForEach(UInt16(1)...UInt16(4), id: \.self) { input in
+                        inputButton(input)
+                    }
+
+                    blackButton(isCompact: false)
                 }
             }
-
-            SourceButton(
-                title: "Black",
-                neutralLabel: "Source",
-                light: light(for: ATEMVideoSource.black.rawValue),
-                isPending: controller.pendingPreviewInput
-                    == ATEMVideoSource.black.rawValue,
-                isEnabled: controller.isConnected,
-                isCompact: true,
-                accessibilityLabel: "Black",
-                accessibilityIdentifier: "blackButton"
-            ) {
-                controller.selectPreviewInput(ATEMVideoSource.black.rawValue)
-            }
-            .frame(maxWidth: 196)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+    }
+
+    private func inputButton(_ input: UInt16) -> some View {
+        SourceButton(
+            title: String(input),
+            neutralLabel: "Input",
+            light: light(for: input),
+            isPending: controller.pendingPreviewInput == input,
+            isEnabled: controller.isConnected,
+            accessibilityLabel: "Input \(input)",
+            accessibilityIdentifier: "input\(input)Button"
+        ) {
+            controller.selectPreviewInput(input)
+        }
+    }
+
+    private func blackButton(isCompact: Bool) -> some View {
+        SourceButton(
+            title: "Black",
+            neutralLabel: "Source",
+            light: light(for: ATEMVideoSource.black.rawValue),
+            isPending: controller.pendingPreviewInput
+                == ATEMVideoSource.black.rawValue,
+            isEnabled: controller.isConnected,
+            isCompact: isCompact,
+            accessibilityLabel: "Black",
+            accessibilityIdentifier: "blackButton"
+        ) {
+            controller.selectPreviewInput(ATEMVideoSource.black.rawValue)
+        }
     }
 
     @ViewBuilder
@@ -343,6 +412,8 @@ private struct SourceButton: View {
                     Text(statusLabel)
                         .font(.caption2.weight(.bold))
                         .tracking(0.8)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                     Spacer()
                     if light != .none || isPending {
                         Circle()
@@ -373,7 +444,7 @@ private struct SourceButton: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .frame(
                 minHeight: isCompact ? compactHeight : regularHeight,
-                maxHeight: isCompact ? compactHeight : .infinity
+                maxHeight: isCompact ? nil : .infinity
             )
             .foregroundStyle(foregroundStyle)
             .background {

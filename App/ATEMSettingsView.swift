@@ -24,7 +24,7 @@ struct ATEMSettingsView: View {
                 } header: {
                     Text("Connection")
                 } footer: {
-                    Text("The iPad connects directly to UDP port 9910. Internet access is not required.")
+                    Text("This device connects directly to UDP port 9910. Internet access is not required.")
                 }
 
                 Section("Diagnostics") {
