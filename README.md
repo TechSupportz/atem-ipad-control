@@ -40,6 +40,9 @@ The captured ground-truth packet log is stored under `Diagnostics/`.
 - Foreground reconnect and screen-awake behavior while connected
 - A handshake diagnostics surface showing Program, Preview, command count,
   and initial-sync completion
+- Physically verified Program 1–4 and Preview 1–4 controls
+- Physically verified CUT and AUTO controls
+- Immediate pending feedback that reconciles against authoritative ATEM state
 
 The packet and command formats were checked against
 [Sofie ATEM Connection](https://github.com/Sofie-Automation/sofie-atem-connection)

@@ -37,6 +37,14 @@ struct ATEMSettingsView: View {
                         "Commands received",
                         value: String(controller.initialStateCommandCount)
                     )
+                    LabeledContent(
+                        "Program",
+                        value: controller.snapshot.programSource?.displayName ?? "—"
+                    )
+                    LabeledContent(
+                        "Preview",
+                        value: controller.snapshot.previewSource?.displayName ?? "—"
+                    )
                 }
             }
             .navigationTitle("ATEM Settings")

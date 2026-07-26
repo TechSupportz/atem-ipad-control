@@ -5,6 +5,11 @@ import Observation
 @MainActor
 @Observable
 final class ATEMController {
+    enum TransitionAction: String {
+        case cut = "CUT"
+        case auto = "AUTO"
+    }
+
     static let defaultHost = "192.168.10.240"
     static let savedHostKey = "atemHost"
 
@@ -13,6 +18,9 @@ final class ATEMController {
     private(set) var initialStateCommandCount = 0
     private(set) var errorMessage: String?
     private(set) var shouldStayConnected = false
+    private(set) var pendingProgramInput: UInt16?
+    private(set) var pendingPreviewInput: UInt16?
+    private(set) var pendingTransition: TransitionAction?
 
     var host: String {
         didSet {
@@ -23,13 +31,20 @@ final class ATEMController {
     private let connection: ATEMConnection
     private var eventTask: Task<Void, Never>?
     private var foregroundReconnectTask: Task<Void, Never>?
+    private var pendingProgramTask: Task<Void, Never>?
+    private var pendingPreviewTask: Task<Void, Never>?
+    private var pendingTransitionTask: Task<Void, Never>?
 
     init(
         host: String = UserDefaults.standard.string(forKey: savedHostKey) ?? defaultHost,
-        connection: ATEMConnection = ATEMConnection()
+        connection: ATEMConnection = ATEMConnection(),
+        initialConnectionState: ATEMConnectionState = .disconnected,
+        initialSnapshot: ATEMStateSnapshot = ATEMStateSnapshot()
     ) {
         self.host = host
         self.connection = connection
+        connectionState = initialConnectionState
+        snapshot = initialSnapshot
         observeConnection()
     }
 
@@ -78,6 +93,7 @@ final class ATEMController {
 
     func disconnect() {
         foregroundReconnectTask?.cancel()
+        clearPendingCommands()
         shouldStayConnected = false
         errorMessage = nil
         connection.disconnect()
@@ -109,6 +125,88 @@ final class ATEMController {
         }
     }
 
+    func selectProgramInput(_ input: UInt16) {
+        guard isConnected,
+              (1...4).contains(input),
+              snapshot.programInput != input
+        else {
+            return
+        }
+
+        pendingProgramTask?.cancel()
+        pendingProgramInput = input
+        errorMessage = nil
+
+        do {
+            try connection.setProgramInput(input)
+            pendingProgramTask = commandTimeoutTask(
+                expectedInput: input,
+                busName: "Program"
+            ) { [weak self] in
+                self?.pendingProgramInput = nil
+            }
+        } catch {
+            pendingProgramInput = nil
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func selectPreviewInput(_ input: UInt16) {
+        guard isConnected,
+              (1...4).contains(input),
+              snapshot.previewInput != input
+        else {
+            return
+        }
+
+        pendingPreviewTask?.cancel()
+        pendingPreviewInput = input
+        errorMessage = nil
+
+        do {
+            try connection.setPreviewInput(input)
+            pendingPreviewTask = commandTimeoutTask(
+                expectedInput: input,
+                busName: "Preview"
+            ) { [weak self] in
+                self?.pendingPreviewInput = nil
+            }
+        } catch {
+            pendingPreviewInput = nil
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func performTransition(_ action: TransitionAction) {
+        guard isConnected, pendingTransition == nil else {
+            return
+        }
+
+        pendingTransition = action
+        errorMessage = nil
+
+        do {
+            switch action {
+            case .cut:
+                try connection.cut()
+            case .auto:
+                try connection.autoTransition()
+            }
+
+            pendingTransitionTask?.cancel()
+            pendingTransitionTask = Task { [weak self] in
+                try? await Task.sleep(for: .milliseconds(500))
+                guard !Task.isCancelled, let self else {
+                    return
+                }
+                self.pendingTransition = nil
+            }
+        } catch {
+            pendingTransition = nil
+            errorMessage = error.localizedDescription
+        }
+    }
+
     private func observeConnection() {
         let events = connection.events
         eventTask = Task { [weak self] in
@@ -130,6 +228,7 @@ final class ATEMController {
             }
         case let .stateChanged(snapshot):
             self.snapshot = snapshot
+            reconcilePendingCommands(with: snapshot)
         case .commandReceived:
             if !snapshot.isInitialSyncComplete {
                 initialStateCommandCount += 1
@@ -143,5 +242,52 @@ final class ATEMController {
         case .packet:
             break
         }
+    }
+
+    private func reconcilePendingCommands(with snapshot: ATEMStateSnapshot) {
+        if snapshot.programInput == pendingProgramInput {
+            pendingProgramTask?.cancel()
+            pendingProgramTask = nil
+            pendingProgramInput = nil
+        }
+
+        if snapshot.previewInput == pendingPreviewInput {
+            pendingPreviewTask?.cancel()
+            pendingPreviewTask = nil
+            pendingPreviewInput = nil
+        }
+
+        if pendingTransition != nil {
+            pendingTransitionTask?.cancel()
+            pendingTransitionTask = nil
+            pendingTransition = nil
+        }
+    }
+
+    private func commandTimeoutTask(
+        expectedInput: UInt16,
+        busName: String,
+        clearPending: @escaping @MainActor () -> Void
+    ) -> Task<Void, Never> {
+        Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(500))
+            guard !Task.isCancelled, let self else {
+                return
+            }
+            clearPending()
+            self.errorMessage = "\(busName) Input \(expectedInput) was not confirmed by the ATEM."
+        }
+    }
+
+    private func clearPendingCommands() {
+        pendingProgramTask?.cancel()
+        pendingPreviewTask?.cancel()
+        pendingTransitionTask?.cancel()
+        pendingProgramTask = nil
+        pendingPreviewTask = nil
+        pendingTransitionTask = nil
+        pendingProgramInput = nil
+        pendingPreviewInput = nil
+        pendingTransition = nil
     }
 }

@@ -19,11 +19,12 @@ struct ControllerShellView: View {
             Color(uiColor: .systemGroupedBackground)
                 .ignoresSafeArea()
 
-            VStack(spacing: 28) {
+            VStack(spacing: 22) {
                 header
-                connectionCard
-                stateCard
-                Spacer(minLength: 0)
+                if let errorMessage = controller.errorMessage {
+                    errorBanner(errorMessage)
+                }
+                SwitcherControlView(controller: controller)
             }
             .padding(32)
         }
@@ -43,13 +44,30 @@ struct ControllerShellView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("ATEM Mini")
                     .font(.largeTitle.bold())
-                Text("Direct local control")
+                Text(controller.host)
+                    .font(.body.monospaced())
                     .foregroundStyle(.secondary)
             }
 
             Spacer()
 
             statusLabel
+
+            if controller.isBusy {
+                ProgressView()
+                    .controlSize(.large)
+            }
+
+            Button(controller.isConnected || controller.isBusy ? "Disconnect" : "Connect") {
+                if controller.isConnected || controller.isBusy {
+                    controller.disconnect()
+                } else {
+                    controller.connect()
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .accessibilityIdentifier("connectionButton")
 
             Button {
                 presentedSheet = .settings
@@ -76,101 +94,15 @@ struct ControllerShellView: View {
         .accessibilityIdentifier("connectionStatus")
     }
 
-    private var connectionCard: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("Switcher address")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .textCase(.uppercase)
-                    Text(controller.host)
-                        .font(.title2.monospaced())
-                }
-
-                Spacer()
-
-                if controller.isBusy {
-                    ProgressView()
-                        .controlSize(.large)
-                }
-
-                Button(controller.isConnected || controller.isBusy ? "Disconnect" : "Connect") {
-                    if controller.isConnected || controller.isBusy {
-                        controller.disconnect()
-                    } else {
-                        controller.connect()
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .accessibilityIdentifier("connectionButton")
-            }
-
-            if let errorMessage = controller.errorMessage {
-                Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.red)
-                    .font(.callout)
-                    .accessibilityIdentifier("connectionError")
-            }
-        }
-        .padding(24)
-        .background(.background, in: RoundedRectangle(cornerRadius: 20))
-    }
-
-    private var stateCard: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Text("Handshake verification")
-                .font(.title3.bold())
-
-            HStack(spacing: 16) {
-                StateValue(
-                    title: "Program",
-                    value: controller.snapshot.programSource?.displayName ?? "—",
-                    color: .red
-                )
-                StateValue(
-                    title: "Preview",
-                    value: controller.snapshot.previewSource?.displayName ?? "—",
-                    color: .green
-                )
-                StateValue(
-                    title: "Initial commands",
-                    value: String(controller.initialStateCommandCount),
-                    color: .blue
-                )
-            }
-
-            Text(
-                controller.snapshot.isInitialSyncComplete
-                    ? "Initial state synchronization completed."
-                    : "Connect to verify the iPad receives the ATEM initial state."
-            )
-            .foregroundStyle(.secondary)
-        }
-        .padding(24)
-        .background(.background, in: RoundedRectangle(cornerRadius: 20))
-    }
-}
-
-private struct StateValue: View {
-    let title: String
-    let value: String
-    let color: Color
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .textCase(.uppercase)
-            Text(value)
-                .font(.system(size: 36, weight: .bold, design: .rounded))
-                .foregroundStyle(color)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(18)
-        .background(color.opacity(0.09), in: RoundedRectangle(cornerRadius: 14))
+    private func errorBanner(_ message: String) -> some View {
+        Label(message, systemImage: "exclamationmark.triangle.fill")
+            .font(.callout.weight(.medium))
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 12)
+            .background(.red, in: RoundedRectangle(cornerRadius: 14))
+            .accessibilityIdentifier("connectionError")
     }
 }
 
@@ -180,6 +112,23 @@ private struct StateValue: View {
             host: ATEMController.defaultHost,
             connection: ATEMConnection(
                 configuration: .init(automaticallyReconnects: false)
+            )
+        )
+    )
+}
+
+#Preview("Connected") {
+    ControllerShellView(
+        controller: ATEMController(
+            host: "192.168.18.240",
+            connection: ATEMConnection(
+                configuration: .init(automaticallyReconnects: false)
+            ),
+            initialConnectionState: .connected,
+            initialSnapshot: ATEMStateSnapshot(
+                programInput: 1,
+                previewInput: 4,
+                isInitialSyncComplete: true
             )
         )
     )

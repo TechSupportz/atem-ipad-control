@@ -12,6 +12,7 @@
 		100000000000000000000003 /* ControllerShellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000003 /* ControllerShellView.swift */; };
 		100000000000000000000004 /* ATEMSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000004 /* ATEMSettingsView.swift */; };
 		100000000000000000000005 /* ATEMKit in Frameworks */ = {isa = PBXBuildFile; productRef = A00000000000000000000002 /* ATEMKit */; };
+		100000000000000000000006 /* SwitcherControlView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000008 /* SwitcherControlView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -22,6 +23,7 @@
 		200000000000000000000005 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		200000000000000000000006 /* Package.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Package.swift; sourceTree = "<group>"; };
 		200000000000000000000007 /* ATEM Controller.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "ATEM Controller.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		200000000000000000000008 /* SwitcherControlView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwitcherControlView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -52,6 +54,7 @@
 				200000000000000000000002 /* ATEMController.swift */,
 				200000000000000000000003 /* ControllerShellView.swift */,
 				200000000000000000000004 /* ATEMSettingsView.swift */,
+				200000000000000000000008 /* SwitcherControlView.swift */,
 				200000000000000000000005 /* Info.plist */,
 			);
 			path = App;
@@ -143,6 +146,7 @@
 				100000000000000000000002 /* ATEMController.swift in Sources */,
 				100000000000000000000003 /* ControllerShellView.swift in Sources */,
 				100000000000000000000004 /* ATEMSettingsView.swift in Sources */,
+				100000000000000000000006 /* SwitcherControlView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
