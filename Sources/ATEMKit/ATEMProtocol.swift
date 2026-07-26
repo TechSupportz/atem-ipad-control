@@ -25,6 +25,8 @@ enum ATEMProtocol {
         // State messages sent by the switcher.
         static let programInput = "PrgI"
         static let previewInput = "PrvI"
+        static let transitionPosition = "TrPs"
+        static let fadeToBlackState = "FtbS"
         static let initialSyncComplete = "InCm"
 
         // Control messages sent by a controller.
@@ -32,6 +34,7 @@ enum ATEMProtocol {
         static let setPreviewInput = "CPvI"
         static let cut = "DCut"
         static let autoTransition = "DAut"
+        static let fadeToBlack = "FtbA"
     }
 
     static func freshInitiationID() -> UInt16 {
@@ -84,6 +87,33 @@ enum ATEMProtocol {
 
     static func transitionCommand(name: String) -> Data {
         command(name: name, body: Data(repeating: 0, count: 4))
+    }
+
+    static func transitionState(from body: Data) -> ATEMTransitionState? {
+        guard body.count >= 6,
+              body[0] == 0,
+              let handlePosition = body.uint16BE(at: 4)
+        else {
+            return nil
+        }
+
+        return ATEMTransitionState(
+            isInTransition: body[1] == 1,
+            remainingFrames: body[2],
+            handlePosition: handlePosition
+        )
+    }
+
+    static func fadeToBlackState(from body: Data) -> ATEMFadeToBlackState? {
+        guard body.count >= 4, body[0] == 0 else {
+            return nil
+        }
+
+        return ATEMFadeToBlackState(
+            isFullyBlack: body[1] == 1,
+            isInTransition: body[2] == 1,
+            remainingFrames: body[3]
+        )
     }
 }
 

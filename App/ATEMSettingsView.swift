@@ -45,6 +45,16 @@ struct ATEMSettingsView: View {
                         "Preview",
                         value: controller.snapshot.previewSource?.displayName ?? "—"
                     )
+                    LabeledContent(
+                        "Transition",
+                        value: controller.snapshot.transition.isInTransition
+                            ? "In progress"
+                            : "Idle"
+                    )
+                    LabeledContent(
+                        "Fade to black",
+                        value: fadeToBlackStatus
+                    )
                 }
             }
             .navigationTitle("ATEM Settings")
@@ -84,5 +94,12 @@ struct ATEMSettingsView: View {
             }
             return String(byte) == component || component == "0"
         }
+    }
+
+    private var fadeToBlackStatus: String {
+        if controller.snapshot.fadeToBlack.isInTransition {
+            return "In progress"
+        }
+        return controller.snapshot.fadeToBlack.isFullyBlack ? "Black" : "Off"
     }
 }

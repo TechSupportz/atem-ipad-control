@@ -169,6 +169,14 @@ public final class ATEMConnection: @unchecked Sendable {
         )
     }
 
+    public func fadeToBlack() throws {
+        try sendCommand(
+            ATEMProtocol.transitionCommand(
+                name: ATEMProtocol.CommandName.fadeToBlack
+            )
+        )
+    }
+
     private static func isValidIPv4Address(_ host: String) -> Bool {
         let components = host.split(separator: ".", omittingEmptySubsequences: false)
         guard components.count == 4 else {
@@ -391,6 +399,24 @@ public final class ATEMConnection: @unchecked Sendable {
                 snapshotStorage.previewInput = source
                 emit(.stateChanged(snapshotStorage))
             }
+
+        case ATEMProtocol.CommandName.transitionPosition:
+            guard let transition = ATEMProtocol.transitionState(from: command.body),
+                  snapshotStorage.transition != transition
+            else {
+                return
+            }
+            snapshotStorage.transition = transition
+            emit(.stateChanged(snapshotStorage))
+
+        case ATEMProtocol.CommandName.fadeToBlackState:
+            guard let fadeToBlack = ATEMProtocol.fadeToBlackState(from: command.body),
+                  snapshotStorage.fadeToBlack != fadeToBlack
+            else {
+                return
+            }
+            snapshotStorage.fadeToBlack = fadeToBlack
+            emit(.stateChanged(snapshotStorage))
 
         case ATEMProtocol.CommandName.initialSyncComplete:
             guard !snapshotStorage.isInitialSyncComplete else {

@@ -21,6 +21,7 @@ final class ATEMController {
     private(set) var pendingProgramInput: UInt16?
     private(set) var pendingPreviewInput: UInt16?
     private(set) var pendingTransition: TransitionAction?
+    private(set) var isFadeToBlackPending = false
 
     var host: String {
         didSet {
@@ -34,6 +35,7 @@ final class ATEMController {
     private var pendingProgramTask: Task<Void, Never>?
     private var pendingPreviewTask: Task<Void, Never>?
     private var pendingTransitionTask: Task<Void, Never>?
+    private var fadeToBlackTask: Task<Void, Never>?
 
     init(
         host: String = UserDefaults.standard.string(forKey: savedHostKey) ?? defaultHost,
@@ -127,7 +129,7 @@ final class ATEMController {
 
     func selectProgramInput(_ input: UInt16) {
         guard isConnected,
-              (1...4).contains(input),
+              (0...4).contains(input),
               snapshot.programInput != input
         else {
             return
@@ -153,7 +155,7 @@ final class ATEMController {
 
     func selectPreviewInput(_ input: UInt16) {
         guard isConnected,
-              (1...4).contains(input),
+              (0...4).contains(input),
               snapshot.previewInput != input
         else {
             return
@@ -207,6 +209,33 @@ final class ATEMController {
         }
     }
 
+    func performFadeToBlack() {
+        guard isConnected,
+              !isFadeToBlackPending,
+              !snapshot.fadeToBlack.isInTransition
+        else {
+            return
+        }
+
+        isFadeToBlackPending = true
+        errorMessage = nil
+
+        do {
+            try connection.fadeToBlack()
+            fadeToBlackTask?.cancel()
+            fadeToBlackTask = Task { [weak self] in
+                try? await Task.sleep(for: .milliseconds(500))
+                guard !Task.isCancelled, let self else {
+                    return
+                }
+                self.isFadeToBlackPending = false
+            }
+        } catch {
+            isFadeToBlackPending = false
+            errorMessage = error.localizedDescription
+        }
+    }
+
     private func observeConnection() {
         let events = connection.events
         eventTask = Task { [weak self] in
@@ -227,8 +256,12 @@ final class ATEMController {
                 errorMessage = error.localizedDescription
             }
         case let .stateChanged(snapshot):
+            let previousSnapshot = self.snapshot
             self.snapshot = snapshot
-            reconcilePendingCommands(with: snapshot)
+            reconcilePendingCommands(
+                from: previousSnapshot,
+                to: snapshot
+            )
         case .commandReceived:
             if !snapshot.isInitialSyncComplete {
                 initialStateCommandCount += 1
@@ -244,7 +277,10 @@ final class ATEMController {
         }
     }
 
-    private func reconcilePendingCommands(with snapshot: ATEMStateSnapshot) {
+    private func reconcilePendingCommands(
+        from previousSnapshot: ATEMStateSnapshot,
+        to snapshot: ATEMStateSnapshot
+    ) {
         if snapshot.programInput == pendingProgramInput {
             pendingProgramTask?.cancel()
             pendingProgramTask = nil
@@ -257,10 +293,20 @@ final class ATEMController {
             pendingPreviewInput = nil
         }
 
-        if pendingTransition != nil {
+        if pendingTransition != nil,
+           snapshot.transition.isInTransition
+            || snapshot.programInput != previousSnapshot.programInput
+            || snapshot.previewInput != previousSnapshot.previewInput {
             pendingTransitionTask?.cancel()
             pendingTransitionTask = nil
             pendingTransition = nil
+        }
+
+        if isFadeToBlackPending,
+           snapshot.fadeToBlack != previousSnapshot.fadeToBlack {
+            fadeToBlackTask?.cancel()
+            fadeToBlackTask = nil
+            isFadeToBlackPending = false
         }
     }
 
@@ -283,11 +329,14 @@ final class ATEMController {
         pendingProgramTask?.cancel()
         pendingPreviewTask?.cancel()
         pendingTransitionTask?.cancel()
+        fadeToBlackTask?.cancel()
         pendingProgramTask = nil
         pendingPreviewTask = nil
         pendingTransitionTask = nil
+        fadeToBlackTask = nil
         pendingProgramInput = nil
         pendingPreviewInput = nil
         pendingTransition = nil
+        isFadeToBlackPending = false
     }
 }

@@ -90,6 +90,42 @@ final class ATEMProtocolTests: XCTestCase {
             ).hexString(),
             "000c00004441757400000000"
         )
+        XCTAssertEqual(
+            ATEMProtocol.transitionCommand(
+                name: ATEMProtocol.CommandName.fadeToBlack
+            ).hexString(),
+            "000c00004674624100000000"
+        )
+    }
+
+    func testTransitionPositionStateMatchesReferenceOffsets() {
+        let state = ATEMProtocol.transitionState(
+            from: Data([0, 1, 12, 0, 0x27, 0x10])
+        )
+
+        XCTAssertEqual(
+            state,
+            ATEMTransitionState(
+                isInTransition: true,
+                remainingFrames: 12,
+                handlePosition: 10_000
+            )
+        )
+    }
+
+    func testFadeToBlackStateMatchesReferenceOffsets() {
+        let state = ATEMProtocol.fadeToBlackState(
+            from: Data([0, 1, 0, 0])
+        )
+
+        XCTAssertEqual(
+            state,
+            ATEMFadeToBlackState(
+                isFullyBlack: true,
+                isInTransition: false,
+                remainingFrames: 0
+            )
+        )
     }
 
     func testParsesMultipleCommands() throws {

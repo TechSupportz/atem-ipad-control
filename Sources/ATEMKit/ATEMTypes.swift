@@ -28,18 +28,56 @@ public struct ATEMVideoSource: RawRepresentable, Equatable, Hashable, Sendable {
     }
 }
 
+public struct ATEMTransitionState: Equatable, Sendable {
+    public internal(set) var isInTransition: Bool
+    public internal(set) var remainingFrames: UInt8
+    public internal(set) var handlePosition: UInt16
+
+    public init(
+        isInTransition: Bool = false,
+        remainingFrames: UInt8 = 0,
+        handlePosition: UInt16 = 0
+    ) {
+        self.isInTransition = isInTransition
+        self.remainingFrames = remainingFrames
+        self.handlePosition = handlePosition
+    }
+}
+
+public struct ATEMFadeToBlackState: Equatable, Sendable {
+    public internal(set) var isFullyBlack: Bool
+    public internal(set) var isInTransition: Bool
+    public internal(set) var remainingFrames: UInt8
+
+    public init(
+        isFullyBlack: Bool = false,
+        isInTransition: Bool = false,
+        remainingFrames: UInt8 = 0
+    ) {
+        self.isFullyBlack = isFullyBlack
+        self.isInTransition = isInTransition
+        self.remainingFrames = remainingFrames
+    }
+}
+
 public struct ATEMStateSnapshot: Equatable, Sendable {
     public internal(set) var programInput: UInt16?
     public internal(set) var previewInput: UInt16?
+    public internal(set) var transition: ATEMTransitionState
+    public internal(set) var fadeToBlack: ATEMFadeToBlackState
     public internal(set) var isInitialSyncComplete: Bool
 
     public init(
         programInput: UInt16? = nil,
         previewInput: UInt16? = nil,
+        transition: ATEMTransitionState = ATEMTransitionState(),
+        fadeToBlack: ATEMFadeToBlackState = ATEMFadeToBlackState(),
         isInitialSyncComplete: Bool = false
     ) {
         self.programInput = programInput
         self.previewInput = previewInput
+        self.transition = transition
+        self.fadeToBlack = fadeToBlack
         self.isInitialSyncComplete = isInitialSyncComplete
     }
 

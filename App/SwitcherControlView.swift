@@ -1,3 +1,4 @@
+import ATEMKit
 import SwiftUI
 
 @MainActor
@@ -5,129 +6,207 @@ struct SwitcherControlView: View {
     let controller: ATEMController
 
     var body: some View {
-        VStack(spacing: 22) {
-            InputBusRow(
-                title: "Program",
-                activeSourceName: controller.snapshot.programSource?.displayName ?? "—",
-                selectedInput: controller.snapshot.programInput,
-                pendingInput: controller.pendingProgramInput,
-                tint: .red,
-                isEnabled: controller.isConnected,
-                accessibilityPrefix: "program"
-            ) { input in
-                controller.selectProgramInput(input)
-            }
-
-            InputBusRow(
-                title: "Preview",
-                activeSourceName: controller.snapshot.previewSource?.displayName ?? "—",
-                selectedInput: controller.snapshot.previewInput,
-                pendingInput: controller.pendingPreviewInput,
-                tint: .green,
-                isEnabled: controller.isConnected,
-                accessibilityPrefix: "preview"
-            ) { input in
-                controller.selectPreviewInput(input)
-            }
+        VStack(spacing: 24) {
+            busHeader
 
             HStack(spacing: 18) {
-                Spacer()
-                TransitionButton(
+                ForEach(UInt16(1)...UInt16(4), id: \.self) { input in
+                    SourceButton(
+                        title: String(input),
+                        height: 94,
+                        light: light(for: input),
+                        isPending: controller.pendingPreviewInput == input,
+                        isEnabled: controller.isConnected,
+                        accessibilityLabel: "Input \(input)",
+                        accessibilityIdentifier: "input\(input)Button"
+                    ) {
+                        controller.selectPreviewInput(input)
+                    }
+                }
+            }
+
+            HStack(spacing: 16) {
+                SourceButton(
+                    title: "BLACK",
+                    height: 66,
+                    light: light(for: ATEMVideoSource.black.rawValue),
+                    isPending: controller.pendingPreviewInput
+                        == ATEMVideoSource.black.rawValue,
+                    isEnabled: controller.isConnected,
+                    accessibilityLabel: "Black",
+                    accessibilityIdentifier: "blackButton"
+                ) {
+                    controller.selectPreviewInput(ATEMVideoSource.black.rawValue)
+                }
+                .frame(width: 170)
+
+                Spacer(minLength: 20)
+
+                ControlButton(
                     title: "CUT",
                     isPending: controller.pendingTransition == .cut,
-                    isEnabled: controller.isConnected && controller.pendingTransition == nil,
-                    tint: .primary,
+                    isEnabled: transitionsAreEnabled,
+                    background: Color(uiColor: .tertiarySystemFill),
+                    foreground: .primary,
+                    blinks: false,
                     accessibilityIdentifier: "cutButton"
                 ) {
                     controller.performTransition(.cut)
                 }
-                TransitionButton(
+                ControlButton(
                     title: "AUTO",
-                    isPending: controller.pendingTransition == .auto,
-                    isEnabled: controller.isConnected && controller.pendingTransition == nil,
-                    tint: .blue,
+                    isPending: controller.pendingTransition == .auto
+                        || controller.snapshot.transition.isInTransition,
+                    isEnabled: transitionsAreEnabled,
+                    background: .blue,
+                    foreground: .white,
+                    blinks: false,
                     accessibilityIdentifier: "autoButton"
                 ) {
                     controller.performTransition(.auto)
                 }
-                Spacer()
+                ControlButton(
+                    title: "FTB",
+                    isPending: controller.isFadeToBlackPending
+                        || controller.snapshot.fadeToBlack.isInTransition,
+                    isEnabled: controller.isConnected
+                        && !controller.isFadeToBlackPending
+                        && !controller.snapshot.fadeToBlack.isInTransition,
+                    background: controller.snapshot.fadeToBlack.isFullyBlack
+                        || controller.snapshot.fadeToBlack.isInTransition
+                        ? .red
+                        : Color(uiColor: .tertiarySystemFill),
+                    foreground: controller.snapshot.fadeToBlack.isFullyBlack
+                        || controller.snapshot.fadeToBlack.isInTransition
+                        ? .white
+                        : .primary,
+                    blinks: controller.snapshot.fadeToBlack.isFullyBlack,
+                    accessibilityIdentifier: "fadeToBlackButton"
+                ) {
+                    controller.performFadeToBlack()
+                }
             }
         }
         .padding(24)
         .background(.background, in: RoundedRectangle(cornerRadius: 22))
     }
+
+    private var busHeader: some View {
+        HStack(spacing: 20) {
+            Text("Sources")
+                .font(.headline)
+                .textCase(.uppercase)
+
+            Spacer()
+
+            SourceStatus(
+                title: "Program",
+                sourceName: controller.snapshot.programSource?.displayName ?? "—",
+                color: .red
+            )
+            SourceStatus(
+                title: controller.snapshot.transition.isInTransition
+                    ? "Transition"
+                    : "Preview",
+                sourceName: controller.snapshot.previewSource?.displayName ?? "—",
+                color: controller.snapshot.transition.isInTransition ? .red : .green
+            )
+        }
+    }
+
+    private var transitionsAreEnabled: Bool {
+        controller.isConnected
+            && controller.pendingTransition == nil
+            && !controller.snapshot.transition.isInTransition
+    }
+
+    private func light(for input: UInt16) -> SourceLight {
+        if controller.snapshot.transition.isInTransition,
+           input == controller.snapshot.programInput
+            || input == controller.snapshot.previewInput {
+            return .program
+        }
+
+        if input == controller.snapshot.programInput {
+            return .program
+        }
+        if input == controller.snapshot.previewInput {
+            return .preview
+        }
+        return .none
+    }
 }
 
-private struct InputBusRow: View {
-    let title: String
-    let activeSourceName: String
-    let selectedInput: UInt16?
-    let pendingInput: UInt16?
-    let tint: Color
-    let isEnabled: Bool
-    let accessibilityPrefix: String
-    let action: (UInt16) -> Void
+private enum SourceLight: Equatable {
+    case none
+    case program
+    case preview
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(title)
-                    .font(.headline)
-                    .textCase(.uppercase)
-                Spacer()
-                Text(activeSourceName)
-                    .font(.headline)
-                    .foregroundStyle(tint)
-                    .contentTransition(.numericText())
-            }
+    var color: Color? {
+        switch self {
+        case .none:
+            return nil
+        case .program:
+            return .red
+        case .preview:
+            return .green
+        }
+    }
 
-            HStack(spacing: 14) {
-                ForEach(UInt16(1)...UInt16(4), id: \.self) { input in
-                    InputButton(
-                        busTitle: title,
-                        input: input,
-                        isSelected: selectedInput == input,
-                        isPending: pendingInput == input,
-                        tint: tint,
-                        isEnabled: isEnabled,
-                        accessibilityIdentifier: "\(accessibilityPrefix)Input\(input)"
-                    ) {
-                        action(input)
-                    }
-                }
-            }
+    var accessibilityValue: String {
+        switch self {
+        case .none:
+            return "Not selected"
+        case .program:
+            return "Program"
+        case .preview:
+            return "Preview"
         }
     }
 }
 
-private struct InputButton: View {
-    let busTitle: String
-    let input: UInt16
-    let isSelected: Bool
+private struct SourceStatus: View {
+    let title: String
+    let sourceName: String
+    let color: Color
+
+    var body: some View {
+        HStack(spacing: 7) {
+            Circle()
+                .fill(color)
+                .frame(width: 11, height: 11)
+            Text("\(title): \(sourceName)")
+                .font(.headline)
+                .foregroundStyle(.primary)
+                .contentTransition(.numericText())
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct SourceButton: View {
+    let title: String
+    let height: CGFloat
+    let light: SourceLight
     let isPending: Bool
-    let tint: Color
     let isEnabled: Bool
+    let accessibilityLabel: String
     let accessibilityIdentifier: String
     let action: () -> Void
 
     var body: some View {
-        Button {
-            guard !isSelected else {
-                return
-            }
-            action()
-        } label: {
-            Text(String(input))
-                .font(.system(size: 34, weight: .bold, design: .rounded))
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: title == "BLACK" ? 20 : 36, weight: .bold, design: .rounded))
                 .frame(maxWidth: .infinity)
-                .frame(minHeight: 76)
+                .frame(height: height)
                 .foregroundStyle(foregroundStyle)
                 .background(backgroundStyle, in: RoundedRectangle(cornerRadius: 16))
                 .overlay {
                     if isPending {
                         RoundedRectangle(cornerRadius: 16)
                             .strokeBorder(
-                                tint,
+                                .green,
                                 style: StrokeStyle(lineWidth: 4, dash: [9, 6])
                             )
                     }
@@ -135,61 +214,92 @@ private struct InputButton: View {
         }
         .buttonStyle(.plain)
         .disabled(!isEnabled)
-        .opacity(isEnabled ? 1 : 0.4)
-        .accessibilityLabel("\(busTitle) Input \(input)")
+        .accessibilityLabel(accessibilityLabel)
         .accessibilityValue(accessibilityValue)
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityAddTraits(light == .none ? [] : .isSelected)
         .accessibilityIdentifier(accessibilityIdentifier)
     }
 
     private var foregroundStyle: Color {
-        isSelected ? .white : .primary
+        if !isEnabled {
+            return Color(uiColor: .secondaryLabel)
+        }
+        return light == .none ? .primary : .white
     }
 
     private var backgroundStyle: Color {
-        if isSelected {
-            return tint
+        if let color = light.color {
+            return color
         }
         if isPending {
-            return tint.opacity(0.24)
+            return Color.green.opacity(0.24)
         }
-        return Color(uiColor: .secondarySystemGroupedBackground)
+        return Color(
+            uiColor: isEnabled
+                ? .secondarySystemGroupedBackground
+                : .tertiarySystemFill
+        )
     }
 
     private var accessibilityValue: String {
-        if isSelected {
-            return "Selected"
-        }
         if isPending {
-            return "Pending"
+            return "\(light.accessibilityValue), pending Preview"
         }
-        return "Not selected"
+        return light.accessibilityValue
     }
 }
 
-private struct TransitionButton: View {
+private struct ControlButton: View {
     let title: String
     let isPending: Bool
     let isEnabled: Bool
-    let tint: Color
+    let background: Color
+    let foreground: Color
+    let blinks: Bool
     let accessibilityIdentifier: String
     let action: () -> Void
+
+    @State private var isDimmed = false
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: 10) {
                 if isPending {
                     ProgressView()
-                        .tint(.white)
+                        .tint(foreground)
                 }
                 Text(title)
                     .font(.title2.bold())
             }
-            .frame(width: 170, height: 62)
+            .frame(width: 150, height: 66)
+            .foregroundStyle(foreground)
+            .background(background, in: RoundedRectangle(cornerRadius: 15))
+            .overlay {
+                RoundedRectangle(cornerRadius: 15)
+                    .strokeBorder(.primary.opacity(0.08), lineWidth: 1)
+            }
         }
-        .buttonStyle(.borderedProminent)
-        .tint(tint)
+        .buttonStyle(.plain)
         .disabled(!isEnabled)
+        .opacity(isEnabled ? (isDimmed ? 0.38 : 1) : 0.68)
         .accessibilityIdentifier(accessibilityIdentifier)
+        .accessibilityValue(blinks ? "Fade to Black active" : "")
+        .task(id: blinks) {
+            isDimmed = false
+            guard blinks else {
+                return
+            }
+
+            while !Task.isCancelled {
+                withAnimation(.easeInOut(duration: 0.35)) {
+                    isDimmed.toggle()
+                }
+                do {
+                    try await Task.sleep(for: .milliseconds(450))
+                } catch {
+                    return
+                }
+            }
+        }
     }
 }

@@ -40,7 +40,8 @@ The captured ground-truth packet log is stored under `Diagnostics/`.
 - Foreground reconnect and screen-awake behavior while connected
 - A handshake diagnostics surface showing Program, Preview, command count,
   and initial-sync completion
-- Physically verified Program 1–4 and Preview 1–4 controls
+- A single combined source bus matching the ATEM Program/Preview panel:
+  Inputs 1–4 stage Preview, red identifies Program, and green identifies Preview
 - Physically verified CUT and AUTO controls
 - Immediate pending feedback that reconciles against authoritative ATEM state
 
@@ -48,6 +49,12 @@ The packet and command formats were checked against
 [Sofie ATEM Connection](https://github.com/Sofie-Automation/sofie-atem-connection)
 at commit `4af354321d7fdf4be5381c9343f28a50e25c43f1` and compared with
 [Swift-Atem](https://github.com/Dev1an/Swift-Atem).
+
+## Platform scope
+
+Haptic feedback is intentionally omitted. iPad hardware does not provide the
+system haptic experience available on iPhone, so visual state and large touch
+targets remain the feedback mechanisms for this controller.
 
 ## Build and test
 
