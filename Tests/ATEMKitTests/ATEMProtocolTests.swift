@@ -12,6 +12,27 @@ final class ATEMProtocolTests: XCTestCase {
         XCTAssertEqual(packet[12], 0x01)
     }
 
+    func testPhysicalATEMHandshakeUsesDifferentAssignedSession() throws {
+        let handshakeResponse = Data([
+            0x10, 0x14, 0x4b, 0xe8, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x10,
+            0x00, 0x00, 0x00, 0x00,
+        ])
+        let firstStatePacketHeader = Data([
+            0x08, 0x0c, 0x80, 0x10, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
+        ])
+
+        let handshake = try ATEMPacketHeader.parse(handshakeResponse)
+        let firstState = try ATEMPacketHeader.parse(firstStatePacketHeader)
+
+        XCTAssertTrue(handshake.contains(ATEMProtocol.newSessionID))
+        XCTAssertEqual(handshake.sessionID, 0x4be8)
+        XCTAssertTrue(firstState.contains(ATEMProtocol.ackRequest))
+        XCTAssertEqual(firstState.sessionID, 0x8010)
+        XCTAssertNotEqual(handshake.sessionID, firstState.sessionID)
+    }
+
     func testAcknowledgementPacketEncoding() throws {
         let packet = ATEMProtocol.packet(
             flags: ATEMProtocol.ackReply,

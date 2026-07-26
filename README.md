@@ -1,10 +1,25 @@
 # ATEM Mini iPad Controller
 
-This repository currently contains Milestone 1 of the implementation plan: a
-small native Swift protocol package and a macOS command-line probe. The SwiftUI
-iPad app intentionally has not been created yet. The project must first prove
-the session handshake and initial state transfer against the physical original
-ATEM Mini.
+This repository contains a physically verified Milestone 1 of the
+implementation plan: a small native Swift protocol package and a macOS
+command-line probe. The SwiftUI iPad app intentionally has not been created
+yet. Its next gate is proving the same handshake and initial state transfer
+from a physical iPad.
+
+## Milestone 1 verification
+
+Verified on 26 July 2026 against an original ATEM Mini at
+`192.168.18.240`:
+
+- The ATEM echoed the client initiation ID, then assigned session `32784`.
+- The complete initial state transfer reached `InCm` successfully.
+- Initial Program and Preview were both Input 1.
+- The connection remained live for more than 90 seconds.
+- Pressing physical Input 2 produced an authoritative `PrvI` update to
+  Preview 2 while Program remained Input 1.
+- No switching commands were issued during this verification.
+
+The captured ground-truth packet log is stored under `Diagnostics/`.
 
 ## What is implemented
 
@@ -65,8 +80,9 @@ one exists) before proceeding to the iPad app.
 
 - UDP port `9910` is used by the ATEM control protocol.
 - The client sends the maintained Sofie handshake shape, replacing its
-  initiation ID for each connection. The switcher remains authoritative and
-  assigns the session ID returned by the new-session packet.
+  initiation ID for each connection. The handshake response echoes that ID;
+  the switcher remains authoritative and supplies the assigned session ID on
+  the first sequenced state packet.
 - Packet counters wrap at `32768`, not `65536`.
 - Mix Effect block 0 is the only block used by the original ATEM Mini.
 - Physical panel Cut Bus versus Program/Preview mode does not alter network

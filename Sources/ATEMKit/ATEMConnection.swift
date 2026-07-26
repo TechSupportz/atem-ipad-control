@@ -43,6 +43,7 @@ public final class ATEMConnection: @unchecked Sendable {
         case stopped
         case waitingForNetwork
         case waitingForHandshake
+        case waitingForAssignedSession
         case established
     }
 
@@ -273,12 +274,23 @@ public final class ATEMConnection: @unchecked Sendable {
             lastReceivedAt = clock.now
 
             if header.contains(ATEMProtocol.newSessionID) {
+                // The handshake response echoes the initiation ID. Acknowledge
+                // that response with the echoed ID, then adopt the ATEM's
+                // assigned session ID from the first sequenced state packet.
                 sessionID = header.sessionID
                 lastReceivedPacketID = header.packetID
-                internalState = .established
+                internalState = .waitingForAssignedSession
                 setConnectionState(.synchronizing)
                 sendAcknowledgement(for: header.packetID)
                 return
+            }
+
+            if internalState == .waitingForAssignedSession,
+               header.contains(ATEMProtocol.ackRequest) {
+                sessionID = header.sessionID
+                lastReceivedPacketID = 0
+                internalState = .established
+                emit(.diagnostic("ATEM assigned session \(sessionID)."))
             }
 
             guard internalState == .established else {

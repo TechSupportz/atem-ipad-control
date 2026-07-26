@@ -11,6 +11,7 @@ private struct Options {
     var timeout: TimeInterval = 15
     var dumpPath: String?
     var automaticallyReconnects = true
+    var previewInputToSet: UInt16?
 
     static func parse(_ arguments: [String]) throws -> Options {
         var options = Options()
@@ -50,6 +51,15 @@ private struct Options {
                 options.dumpPath = arguments[index]
             case "--no-reconnect":
                 options.automaticallyReconnects = false
+            case "--set-preview":
+                index += 1
+                guard index < arguments.count,
+                      let input = UInt16(arguments[index]),
+                      (1...4).contains(input)
+                else {
+                    throw UsageError("--set-preview requires an input from 1 to 4.")
+                }
+                options.previewInputToSet = input
             case "--help", "-h":
                 printUsage()
                 exit(EXIT_SUCCESS)
@@ -71,6 +81,7 @@ private struct Options {
           --timeout <seconds> Initial synchronization deadline (default: 15)
           --dump <path>       Initial-state dump output path
           --no-reconnect      Stop instead of reconnecting after connection loss
+          --set-preview <1-4> Stage one Preview input after synchronization
           --help              Show this help
         """)
     }
@@ -120,9 +131,18 @@ private final class InitialStateDump: @unchecked Sendable {
 
 private actor SynchronizationFlag {
     private(set) var isComplete = false
+    private var didSendRequestedCommand = false
 
     func markComplete() {
         isComplete = true
+    }
+
+    func claimRequestedCommand() -> Bool {
+        guard !didSendRequestedCommand else {
+            return false
+        }
+        didSendRequestedCommand = true
+        return true
     }
 }
 
@@ -188,8 +208,14 @@ private enum ATEMProbe {
                         case let .packet(direction, packet):
                             if direction == .received {
                                 dump.append(packet)
+                                print(
+                                    "[\(timestamp())] \(direction.rawValue) \(packet.count) bytes"
+                                )
+                            } else {
+                                print(
+                                    "[\(timestamp())] \(direction.rawValue) \(packet.hexDump)"
+                                )
                             }
-                            print("[\(timestamp())] \(direction.rawValue) \(packet.hexDump)")
 
                         case let .diagnostic(message):
                             print("[\(timestamp())] Diagnostic: \(message)")
@@ -203,6 +229,19 @@ private enum ATEMProbe {
                                 print("[\(timestamp())] Leave this running for 30 seconds, then operate the hardware panel.")
                             } catch {
                                 print("[\(timestamp())] Could not save state dump: \(error.localizedDescription)")
+                            }
+                            if let input = options.previewInputToSet,
+                               await synchronization.claimRequestedCommand() {
+                                do {
+                                    try connection.setPreviewInput(input)
+                                    print(
+                                        "[\(timestamp())] Requested Preview input \(input); awaiting authoritative PrvI response."
+                                    )
+                                } catch {
+                                    print(
+                                        "[\(timestamp())] Could not request Preview input \(input): \(error.localizedDescription)"
+                                    )
+                                }
                             }
                         }
                     }
