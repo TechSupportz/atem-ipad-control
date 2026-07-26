@@ -74,7 +74,7 @@ struct ATEMSettingsView: View {
                 }
             }
         }
-        .presentationDetents([.medium])
+        .presentationDetents([.large])
     }
 
     private func isValidIPv4Address(_ value: String) -> Bool {

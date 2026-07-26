@@ -13,6 +13,7 @@
 		100000000000000000000004 /* ATEMSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000004 /* ATEMSettingsView.swift */; };
 		100000000000000000000005 /* ATEMKit in Frameworks */ = {isa = PBXBuildFile; productRef = A00000000000000000000002 /* ATEMKit */; };
 		100000000000000000000006 /* SwitcherControlView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000008 /* SwitcherControlView.swift */; };
+		100000000000000000000007 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000009 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -24,6 +25,7 @@
 		200000000000000000000006 /* Package.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Package.swift; sourceTree = "<group>"; };
 		200000000000000000000007 /* ATEM Controller.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "ATEM Controller.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		200000000000000000000008 /* SwitcherControlView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwitcherControlView.swift; sourceTree = "<group>"; };
+		200000000000000000000009 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -55,6 +57,7 @@
 				200000000000000000000003 /* ControllerShellView.swift */,
 				200000000000000000000004 /* ATEMSettingsView.swift */,
 				200000000000000000000008 /* SwitcherControlView.swift */,
+				200000000000000000000009 /* Assets.xcassets */,
 				200000000000000000000005 /* Info.plist */,
 			);
 			path = App;
@@ -132,6 +135,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				100000000000000000000007 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -271,6 +275,7 @@
 		B000000000000000000000003 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = Q5UAL6TUVS;
@@ -291,6 +296,7 @@
 		B000000000000000000000004 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = Q5UAL6TUVS;

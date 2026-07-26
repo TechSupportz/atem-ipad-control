@@ -19,14 +19,26 @@ struct ControllerShellView: View {
             Color(uiColor: .systemGroupedBackground)
                 .ignoresSafeArea()
 
-            VStack(spacing: 22) {
-                header
-                if let errorMessage = controller.errorMessage {
-                    errorBanner(errorMessage)
+            GeometryReader { geometry in
+                ScrollView {
+                    VStack(spacing: 18) {
+                        header
+                        if let errorMessage = controller.errorMessage {
+                            errorBanner(errorMessage)
+                        }
+                        SwitcherControlView(controller: controller)
+                            .frame(maxHeight: .infinity)
+                    }
+                    .frame(
+                        maxWidth: 1180,
+                        minHeight: max(geometry.size.height - 44, 0)
+                    )
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 22)
+                    .frame(maxWidth: .infinity)
                 }
-                SwitcherControlView(controller: controller)
+                .scrollBounceBehavior(.basedOnSize)
             }
-            .padding(32)
         }
         .sheet(item: $presentedSheet) { destination in
             switch destination {
@@ -40,16 +52,16 @@ struct ControllerShellView: View {
     }
 
     private var header: some View {
-        HStack {
+        HStack(spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("ATEM Mini")
-                    .font(.largeTitle.bold())
+                    .font(.title.bold())
                 Text(controller.host)
-                    .font(.body.monospaced())
+                    .font(.subheadline.monospaced())
                     .foregroundStyle(.secondary)
             }
 
-            Spacer()
+            Spacer(minLength: 12)
 
             statusLabel
 
@@ -58,16 +70,7 @@ struct ControllerShellView: View {
                     .controlSize(.large)
             }
 
-            Button(controller.isConnected || controller.isBusy ? "Disconnect" : "Connect") {
-                if controller.isConnected || controller.isBusy {
-                    controller.disconnect()
-                } else {
-                    controller.connect()
-                }
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .accessibilityIdentifier("connectionButton")
+            connectionButton
 
             Button {
                 presentedSheet = .settings
@@ -78,20 +81,70 @@ struct ControllerShellView: View {
                     .frame(width: 52, height: 52)
             }
             .buttonStyle(.bordered)
+            .buttonBorderShape(.circle)
             .accessibilityIdentifier("settingsButton")
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+        .background(.background, in: RoundedRectangle(cornerRadius: 20))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20)
+                .strokeBorder(.primary.opacity(0.07), lineWidth: 1)
+        }
+    }
+
+    @ViewBuilder
+    private var connectionButton: some View {
+        if controller.isConnected || controller.isBusy {
+            Button {
+                controller.disconnect()
+            } label: {
+                Label(
+                    controller.isBusy ? "Cancel" : "Disconnect",
+                    systemImage: "stop.fill"
+                )
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+            .accessibilityIdentifier("connectionButton")
+        } else {
+            Button {
+                controller.connect()
+            } label: {
+                Label("Connect", systemImage: "bolt.horizontal.fill")
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .accessibilityIdentifier("connectionButton")
         }
     }
 
     private var statusLabel: some View {
         HStack(spacing: 8) {
             Circle()
-                .fill(controller.isConnected ? .green : .secondary)
+                .fill(statusColor)
                 .frame(width: 12, height: 12)
             Text(controller.statusTitle)
                 .font(.headline)
         }
+        .padding(.horizontal, 13)
+        .padding(.vertical, 9)
+        .background(
+            statusColor.opacity(controller.isConnected ? 0.13 : 0.08),
+            in: Capsule()
+        )
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("connectionStatus")
+    }
+
+    private var statusColor: Color {
+        if controller.isConnected {
+            return .green
+        }
+        if controller.isBusy {
+            return .orange
+        }
+        return .secondary
     }
 
     private func errorBanner(_ message: String) -> some View {
