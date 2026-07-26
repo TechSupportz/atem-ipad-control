@@ -226,9 +226,14 @@ public final class ATEMConnection: @unchecked Sendable {
             let hello = ATEMProtocol.connectHello(initiationID: initiationID)
             sendRaw(hello)
         case let .waiting(error):
-            emit(.diagnostic("Network waiting: \(error.localizedDescription)"))
+            let connectionError = connectionError(for: error)
+            if connectionError == .localNetworkPermissionDenied {
+                handleFailure(connectionError)
+            } else {
+                emit(.diagnostic("Network waiting: \(error.localizedDescription)"))
+            }
         case let .failed(error):
-            handleFailure(.networkUnavailable(error.localizedDescription))
+            handleFailure(connectionError(for: error))
         case .cancelled:
             if !explicitlyDisconnected, internalState != .stopped {
                 handleFailure(.disconnected)
@@ -556,7 +561,9 @@ public final class ATEMConnection: @unchecked Sendable {
         emit(.diagnostic(error.localizedDescription))
         stopTransport()
 
-        if !explicitlyDisconnected, configuration.automaticallyReconnects {
+        if !explicitlyDisconnected,
+           configuration.automaticallyReconnects,
+           error != .localNetworkPermissionDenied {
             setConnectionState(.reconnecting)
             let workItem = DispatchWorkItem { [weak self] in
                 guard let self, !self.explicitlyDisconnected else {
@@ -606,6 +613,13 @@ public final class ATEMConnection: @unchecked Sendable {
 
     private func emit(_ event: Event) {
         continuation.yield(event)
+    }
+
+    private func connectionError(for error: NWError) -> ATEMConnectionError {
+        if case .posix(.EACCES) = error {
+            return .localNetworkPermissionDenied
+        }
+        return .networkUnavailable(error.localizedDescription)
     }
 
     private func increment(_ packetID: UInt16) -> UInt16 {

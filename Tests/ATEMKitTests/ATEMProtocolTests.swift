@@ -2,6 +2,19 @@ import XCTest
 @testable import ATEMKit
 
 final class ATEMProtocolTests: XCTestCase {
+    func testVideoSourceNamesMapZeroToBlack() {
+        XCTAssertEqual(ATEMVideoSource.black.displayName, "Black")
+        XCTAssertEqual(ATEMVideoSource.input(4)?.displayName, "Input 4")
+        XCTAssertEqual(ATEMVideoSource(rawValue: 1000).displayName, "Source 1000")
+    }
+
+    func testLocalNetworkPermissionErrorExplainsRecovery() {
+        XCTAssertEqual(
+            ATEMConnectionError.localNetworkPermissionDenied.localizedDescription,
+            "Local Network access is denied. Allow access in Settings, then try again."
+        )
+    }
+
     func testConnectHelloUsesFreshInitiationID() {
         let packet = ATEMProtocol.connectHello(initiationID: 0x1234)
 

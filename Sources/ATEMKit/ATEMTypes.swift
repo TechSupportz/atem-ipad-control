@@ -1,5 +1,33 @@
 import Foundation
 
+public struct ATEMVideoSource: RawRepresentable, Equatable, Hashable, Sendable {
+    public static let black = ATEMVideoSource(rawValue: 0)
+
+    public let rawValue: UInt16
+
+    public init(rawValue: UInt16) {
+        self.rawValue = rawValue
+    }
+
+    public static func input(_ number: UInt16) -> ATEMVideoSource? {
+        guard (1...4).contains(number) else {
+            return nil
+        }
+        return ATEMVideoSource(rawValue: number)
+    }
+
+    public var displayName: String {
+        switch rawValue {
+        case Self.black.rawValue:
+            return "Black"
+        case 1...4:
+            return "Input \(rawValue)"
+        default:
+            return "Source \(rawValue)"
+        }
+    }
+}
+
 public struct ATEMStateSnapshot: Equatable, Sendable {
     public internal(set) var programInput: UInt16?
     public internal(set) var previewInput: UInt16?
@@ -14,6 +42,14 @@ public struct ATEMStateSnapshot: Equatable, Sendable {
         self.previewInput = previewInput
         self.isInitialSyncComplete = isInitialSyncComplete
     }
+
+    public var programSource: ATEMVideoSource? {
+        programInput.map(ATEMVideoSource.init(rawValue:))
+    }
+
+    public var previewSource: ATEMVideoSource? {
+        previewInput.map(ATEMVideoSource.init(rawValue:))
+    }
 }
 
 public enum ATEMConnectionState: Equatable, Sendable {
@@ -27,6 +63,7 @@ public enum ATEMConnectionState: Equatable, Sendable {
 
 public enum ATEMConnectionError: Error, Equatable, Sendable {
     case invalidHost(String)
+    case localNetworkPermissionDenied
     case connectionTimedOut
     case networkUnavailable(String)
     case malformedPacket(String)
@@ -39,6 +76,8 @@ extension ATEMConnectionError: LocalizedError {
         switch self {
         case let .invalidHost(host):
             return "The ATEM host “\(host)” is not a valid IPv4 address."
+        case .localNetworkPermissionDenied:
+            return "Local Network access is denied. Allow access in Settings, then try again."
         case .connectionTimedOut:
             return "No ATEM packets were received before the connection timed out."
         case let .networkUnavailable(message):

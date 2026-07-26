@@ -1,10 +1,9 @@
 # ATEM Mini iPad Controller
 
-This repository contains a physically verified Milestone 1 of the
-implementation plan: a small native Swift protocol package and a macOS
-command-line probe. The SwiftUI iPad app intentionally has not been created
-yet. Its next gate is proving the same handshake and initial state transfer
-from a physical iPad.
+This repository contains a physically verified ATEM protocol layer and a
+SwiftUI iPad app shell. The next gate is proving the same handshake and
+initial state transfer from a physical iPad, including iPadOS Local Network
+permission behavior.
 
 ## Milestone 1 verification
 
@@ -17,7 +16,8 @@ Verified on 26 July 2026 against an original ATEM Mini at
 - The connection remained live for more than 90 seconds.
 - Pressing physical Input 2 produced an authoritative `PrvI` update to
   Preview 2 while Program remained Input 1.
-- No switching commands were issued during this verification.
+- Preview Input 4, CUT, and AUTO were subsequently exercised from the probe;
+  the physical panel and authoritative ATEM state updates agreed each time.
 
 The captured ground-truth packet log is stored under `Diagnostics/`.
 
@@ -34,6 +34,12 @@ The captured ground-truth packet log is stored under `Diagnostics/`.
 - Authoritative Program (`PrgI`) and Preview (`PrvI`) state parsing
 - Typed Program, Preview, Cut, and Auto command encoding
 - `atem-probe`, a macOS executable for physical-switcher verification
+- A landscape iPad app target linked to the local `ATEMKit` package
+- Persisted switcher IP configuration and connect/disconnect controls
+- Local Network usage description and explicit permission-denied messaging
+- Foreground reconnect and screen-awake behavior while connected
+- A handshake diagnostics surface showing Program, Preview, command count,
+  and initial-sync completion
 
 The packet and command formats were checked against
 [Sofie ATEM Connection](https://github.com/Sofie-Automation/sofie-atem-connection)
@@ -75,6 +81,22 @@ ground truth for later parsing work. A custom location can be supplied with
 If the probe times out, rerun it with the ATEM powered on and ATEM Software
 Control closed, then share the complete console output and generated dump (if
 one exists) before proceeding to the iPad app.
+
+## Physical iPad verification
+
+1. Open `ATEMController.xcodeproj` in Xcode.
+2. Select the **ATEM Controller** scheme and a connected iPad.
+3. Choose a Development Team under **Signing & Capabilities**, then run.
+4. Open Settings in the app and set the address to `192.168.18.240`.
+5. Tap **Connect** and allow Local Network access when prompted.
+6. Confirm the status reaches **Connected**, initial sync reads **Complete**,
+   and the displayed Program/Preview inputs match the ATEM panel.
+7. Leave the Beacon WAN disconnected throughout the test.
+
+For the denial path, delete the app from the iPad, reinstall it, tap Connect,
+and deny Local Network access. The app should stop retrying and display a
+message directing you to enable access in Settings. Re-enable access in the
+iPad Settings app, foreground ATEM Controller, and connect again.
 
 ## Protocol assumptions
 

@@ -4,4 +4,5 @@
 DerivedData/
 *.xcodeproj/xcuserdata/
 *.xcworkspace/xcuserdata/
+**/xcuserdata/
 atem-state-dump-*.log
