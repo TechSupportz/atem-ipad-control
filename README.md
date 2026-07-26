@@ -1,121 +1,71 @@
 # ATEM Mini iPad Controller
 
-This repository contains a physically verified ATEM protocol layer and a
-SwiftUI iPad app shell. The next gate is proving the same handshake and
-initial state transfer from a physical iPad, including iPadOS Local Network
-permission behavior.
+An iPad app for controlling a Blackmagic ATEM Mini over Wi-Fi.
 
-## Milestone 1 verification
+The ATEM Mini is a small live-production video switcher. This app connects to
+one over the local network and mirrors its live-switching controls: you enter
+the switcher's IP address, connect, and the app shows which source is on
+Program, which is staged on Preview, and gives you buttons to change either.
 
-Verified on 26 July 2026 against an original ATEM Mini at
-`192.168.18.240`:
+## Controls
 
-- The ATEM echoed the client initiation ID, then assigned session `32784`.
-- The complete initial state transfer reached `InCm` successfully.
-- Initial Program and Preview were both Input 1.
-- The connection remained live for more than 90 seconds.
-- Pressing physical Input 2 produced an authoritative `PrvI` update to
-  Preview 2 while Program remained Input 1.
-- Preview Input 4, CUT, and AUTO were subsequently exercised from the probe;
-  the physical panel and authoritative ATEM state updates agreed each time.
+- **Program and Preview state.** Program is red, Preview is green, matching the
+  hardware panel. State comes from the switcher, so presses on the physical
+  panel show up in the app too.
+- **Sources.** Inputs 1–4 stage a source on Preview.
+- **CUT and AUTO.** Instant switch, or a timed transition.
+- **FTB.** Fade to black, blinking while program output is black.
 
-The captured ground-truth packet log is stored under `Diagnostics/`.
+Taps show pending feedback immediately, then reconcile against the state the
+ATEM reports.
 
-## What is implemented
+## Behaviour
 
-- `ATEMKit`, a dependency-free Swift package using `Network.framework`
-- Direct UDP connection to port `9910`
-- Session handshake and fresh client initiation ID
-- 15-bit packet sequencing and cumulative acknowledgements
-- Retransmit requests, timed retransmission, and bounded retry handling
-- Idle keepalive packets and five-second liveness detection
-- Safe parsing of framed ATEM commands
-- Initial state dump capture through the `InCm` marker
-- Authoritative Program (`PrgI`) and Preview (`PrvI`) state parsing
-- Typed Program, Preview, Cut, and Auto command encoding
-- `atem-probe`, a macOS executable for physical-switcher verification
-- A landscape iPad app target linked to the local `ATEMKit` package
-- Persisted switcher IP configuration and connect/disconnect controls
-- Local Network usage description and explicit permission-denied messaging
-- Foreground reconnect and screen-awake behavior while connected
-- A handshake diagnostics surface showing Program, Preview, command count,
-  and initial-sync completion
-- A single combined source bus matching the ATEM Program/Preview panel:
-  Inputs 1–4 stage Preview, red identifies Program, and green identifies Preview
-- Physically verified CUT and AUTO controls
-- Immediate pending feedback that reconciles against authoritative ATEM state
+- Landscape layout, large touch targets.
+- Screen stays awake while connected.
+- Reconnects when the app returns to the foreground.
+- Reports connection loss, and separately reports when iPadOS has denied Local
+  Network access.
+- No haptics. iPad does not have the iPhone haptic engine, so feedback is
+  visual.
 
-The packet and command formats were checked against
-[Sofie ATEM Connection](https://github.com/Sofie-Automation/sofie-atem-connection)
-at commit `4af354321d7fdf4be5381c9343f28a50e25c43f1` and compared with
-[Swift-Atem](https://github.com/Dev1an/Swift-Atem).
+## Scope
 
-## Platform scope
+Live switching only. No keyers, audio mixing, macros, media player, or
+streaming controls.
 
-Haptic feedback is intentionally omitted. iPad hardware does not provide the
-system haptic experience available on iPhone, so visual state and large touch
-targets remain the feedback mechanisms for this controller.
+Supported hardware is the original ATEM Mini: four HDMI inputs, one Mix Effect
+block. Other ATEM models are not a target.
 
-## Build and test
+The networking does not use the Blackmagic SDK. It is a clean-room
+implementation of the ATEM control protocol on `Network.framework`, verified
+against physical hardware.
 
-```sh
-swift test
-swift build --product atem-probe
-```
+## Getting started
 
-## Physical ATEM verification
-
-1. Connect the Mac to the same Nokia Beacon network as the ATEM Mini.
-2. Confirm the ATEM address in ATEM Setup. The default below is
-   `192.168.10.240`.
-3. Quit ATEM Software Control for the first test so another client cannot
-   obscure a connection-slot issue.
-4. Run:
-
-   ```sh
-   swift run atem-probe --host 192.168.10.240
-   ```
-
-5. Wait for `Initial state synchronization complete`.
-6. Leave the probe running for at least 30 seconds. It should remain connected
-   and continue to report keepalive acknowledgements without a reconnect.
-7. Press Input 1–4 on the hardware panel. The probe should print Program or
-   Preview changes that match the switcher's actual state.
-8. Stop with Control-C.
-
-The probe saves the complete inbound initial-state datagrams to a timestamped
-`atem-state-dump-*.log` file in the current directory. Keep that file: it is the
-ground truth for later parsing work. A custom location can be supplied with
-`--dump /absolute/path/to/file.log`.
-
-If the probe times out, rerun it with the ATEM powered on and ATEM Software
-Control closed, then share the complete console output and generated dump (if
-one exists) before proceeding to the iPad app.
-
-## Physical iPad verification
+Requires a Mac with Xcode, an iPad, and an ATEM Mini on the same network.
 
 1. Open `ATEMController.xcodeproj` in Xcode.
-2. Select the **ATEM Controller** scheme and a connected iPad.
+2. Select the **ATEM Controller** scheme and your connected iPad.
 3. Choose a Development Team under **Signing & Capabilities**, then run.
-4. Open Settings in the app and set the address to `192.168.18.240`.
-5. Tap **Connect** and allow Local Network access when prompted.
-6. Confirm the status reaches **Connected**, initial sync reads **Complete**,
-   and the displayed Program/Preview inputs match the ATEM panel.
-7. Leave the Beacon WAN disconnected throughout the test.
+4. In the app, open Settings and enter the switcher's IP address. ATEM Setup
+   will tell you what it is.
+5. Tap **Connect** and allow Local Network access when iPadOS asks.
 
-For the denial path, delete the app from the iPad, reinstall it, tap Connect,
-and deny Local Network access. The app should stop retrying and display a
-message directing you to enable access in Settings. Re-enable access in the
-iPad Settings app, foreground ATEM Controller, and connect again.
+The address persists between launches.
 
-## Protocol assumptions
+## Repository layout
 
-- UDP port `9910` is used by the ATEM control protocol.
-- The client sends the maintained Sofie handshake shape, replacing its
-  initiation ID for each connection. The handshake response echoes that ID;
-  the switcher remains authoritative and supplies the assigned session ID on
-  the first sequenced state packet.
-- Packet counters wrap at `32768`, not `65536`.
-- Mix Effect block 0 is the only block used by the original ATEM Mini.
-- Physical panel Cut Bus versus Program/Preview mode does not alter network
-  state parsing; incoming `PrgI` and `PrvI` messages always win.
+| Path | What it holds |
+| --- | --- |
+| `App/` | The SwiftUI iPad app |
+| `Sources/ATEMKit/` | The ATEM protocol client |
+| `Sources/ATEMProbe/` | `atem-probe`, a macOS CLI for testing against hardware |
+| `Diagnostics/` | Captured ground-truth packet logs |
+| `plans/` | Design notes for in-progress work |
+| `teaching/` | Learning material on the protocol and this codebase |
+
+## Further reading
+
+[TECHNICAL.md](TECHNICAL.md) covers the protocol implementation, hardware
+verification procedures, and the assumptions the client relies on.
