@@ -210,6 +210,26 @@ struct SwitcherControlView: View {
     }
 }
 
+private enum SwitcherMotion {
+    static let warningPulse = Animation.linear(duration: 0.18)
+    static let warningPulseInterval = Duration.milliseconds(360)
+    static let warningDimOpacity = 0.35
+    static let press = Animation.timingCurve(
+        0.23,
+        1,
+        0.32,
+        1,
+        duration: 0.12
+    )
+    static let stateChange = Animation.timingCurve(
+        0.23,
+        1,
+        0.32,
+        1,
+        duration: 0.12
+    )
+}
+
 private enum SourceLight: Equatable {
     case none
     case program
@@ -289,7 +309,6 @@ private struct TallyStatus: View {
                 Text(sourceName)
                     .font(.headline)
                     .foregroundStyle(.primary)
-                    .contentTransition(.numericText())
             }
             .frame(minWidth: 88, alignment: .leading)
         }
@@ -357,7 +376,12 @@ private struct SourceButton: View {
                 maxHeight: isCompact ? compactHeight : .infinity
             )
             .foregroundStyle(foregroundStyle)
-            .background(backgroundStyle, in: RoundedRectangle(cornerRadius: 16))
+            .background {
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(backgroundStyle)
+                    .animation(SwitcherMotion.stateChange, value: light)
+                    .animation(SwitcherMotion.stateChange, value: isPending)
+            }
             .overlay(alignment: .top) {
                 if isPending {
                     RoundedRectangle(cornerRadius: 3)
@@ -370,6 +394,8 @@ private struct SourceButton: View {
             .overlay {
                 RoundedRectangle(cornerRadius: 16)
                     .strokeBorder(borderStyle, lineWidth: light == .none ? 1 : 2)
+                    .animation(SwitcherMotion.stateChange, value: light)
+                    .animation(SwitcherMotion.stateChange, value: isPending)
             }
         }
         .buttonStyle(PanelButtonStyle())
@@ -437,15 +463,11 @@ private struct ControlButton: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ScaledMetric(relativeTo: .body) private var minimumHeight: CGFloat = 60
+    @State private var warningBackgroundOpacity = 1.0
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: 10) {
-                if isPending {
-                    ProgressView()
-                        .tint(foreground)
-                }
-
                 VStack(alignment: .leading, spacing: 1) {
                     Text(title)
                         .font(.headline.bold())
@@ -456,6 +478,16 @@ private struct ControlButton: View {
                 }
 
                 Spacer(minLength: 2)
+
+                ZStack {
+                    if isPending {
+                        ProgressView()
+                            .tint(foreground)
+                            .transition(.opacity)
+                    }
+                }
+                .frame(width: 20, height: 20)
+                .animation(SwitcherMotion.press, value: isPending)
             }
             .padding(.horizontal, 16)
             .frame(
@@ -465,7 +497,10 @@ private struct ControlButton: View {
                 alignment: .leading
             )
             .foregroundStyle(foreground)
-            .background(background, in: RoundedRectangle(cornerRadius: 14))
+            .background(
+                background.opacity(warningBackgroundOpacity),
+                in: RoundedRectangle(cornerRadius: 14)
+            )
             .overlay {
                 RoundedRectangle(cornerRadius: 14)
                     .strokeBorder(.primary.opacity(0.09), lineWidth: 1)
@@ -477,25 +512,34 @@ private struct ControlButton: View {
         .accessibilityLabel(title)
         .accessibilityValue(accessibilityValue)
         .accessibilityIdentifier(accessibilityIdentifier)
-        .phaseAnimator(blinkPhases) { content, opacity in
-            content.opacity(opacity)
-        } animation: { _ in
-            .easeInOut(duration: 0.38)
-        }
-    }
+        .task(id: blinks && !reduceMotion) {
+            warningBackgroundOpacity = 1
+            guard blinks && !reduceMotion else {
+                return
+            }
 
-    private var blinkPhases: [Double] {
-        blinks && !reduceMotion ? [1, 0.35] : [1]
+            do {
+                while !Task.isCancelled {
+                    withAnimation(SwitcherMotion.warningPulse) {
+                        warningBackgroundOpacity = SwitcherMotion.warningDimOpacity
+                    }
+                    try await Task.sleep(for: SwitcherMotion.warningPulseInterval)
+                    withAnimation(SwitcherMotion.warningPulse) {
+                        warningBackgroundOpacity = 1
+                    }
+                    try await Task.sleep(for: SwitcherMotion.warningPulseInterval)
+                }
+            } catch {
+                return
+            }
+        }
     }
 }
 
 private struct PanelButtonStyle: ButtonStyle {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.98 : 1)
-            .brightness(configuration.isPressed ? -0.05 : 0)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+            .opacity(configuration.isPressed ? 0.82 : 1)
+            .animation(SwitcherMotion.press, value: configuration.isPressed)
     }
 }
