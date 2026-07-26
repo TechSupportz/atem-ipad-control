@@ -6,12 +6,18 @@ import Darwin
 #endif
 
 private struct Options {
+    enum TransitionAction {
+        case cut
+        case auto
+    }
+
     var host = "192.168.10.240"
     var port: UInt16 = 9910
     var timeout: TimeInterval = 15
     var dumpPath: String?
     var automaticallyReconnects = true
     var previewInputToSet: UInt16?
+    var transitionAction: TransitionAction?
 
     static func parse(_ arguments: [String]) throws -> Options {
         var options = Options()
@@ -55,11 +61,29 @@ private struct Options {
                 index += 1
                 guard index < arguments.count,
                       let input = UInt16(arguments[index]),
-                      (1...4).contains(input)
+                      (1...4).contains(input),
+                      options.previewInputToSet == nil,
+                      options.transitionAction == nil
                 else {
-                    throw UsageError("--set-preview requires an input from 1 to 4.")
+                    throw UsageError(
+                        "--set-preview requires an input from 1 to 4 and cannot be combined with another action."
+                    )
                 }
                 options.previewInputToSet = input
+            case "--cut":
+                guard options.previewInputToSet == nil,
+                      options.transitionAction == nil
+                else {
+                    throw UsageError("--cut cannot be combined with another action.")
+                }
+                options.transitionAction = .cut
+            case "--auto":
+                guard options.previewInputToSet == nil,
+                      options.transitionAction == nil
+                else {
+                    throw UsageError("--auto cannot be combined with another action.")
+                }
+                options.transitionAction = .auto
             case "--help", "-h":
                 printUsage()
                 exit(EXIT_SUCCESS)
@@ -82,6 +106,8 @@ private struct Options {
           --dump <path>       Initial-state dump output path
           --no-reconnect      Stop instead of reconnecting after connection loss
           --set-preview <1-4> Stage one Preview input after synchronization
+          --cut               Perform one CUT after synchronization
+          --auto              Perform one AUTO transition after synchronization
           --help              Show this help
         """)
     }
@@ -240,6 +266,26 @@ private enum ATEMProbe {
                                 } catch {
                                     print(
                                         "[\(timestamp())] Could not request Preview input \(input): \(error.localizedDescription)"
+                                    )
+                                }
+                            } else if let action = options.transitionAction,
+                                      await synchronization.claimRequestedCommand() {
+                                do {
+                                    switch action {
+                                    case .cut:
+                                        try connection.cut()
+                                        print(
+                                            "[\(timestamp())] Requested CUT; awaiting authoritative Program/Preview response."
+                                        )
+                                    case .auto:
+                                        try connection.autoTransition()
+                                        print(
+                                            "[\(timestamp())] Requested AUTO; awaiting authoritative Program/Preview response."
+                                        )
+                                    }
+                                } catch {
+                                    print(
+                                        "[\(timestamp())] Could not request transition: \(error.localizedDescription)"
                                     )
                                 }
                             }
