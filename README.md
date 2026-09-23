@@ -7,6 +7,11 @@ one over the local network and mirrors its live-switching controls: you enter
 the switcher's IP address, connect, and the app shows which source is on
 Program, which is staged on Preview, and gives you buttons to change either.
 
+<p align="center">
+  <img src="docs/images/demo.gif" height="320" alt="Switching from the app and the hardware panel, kept in sync">
+  <img src="docs/images/in-use.jpg" height="320" alt="The app in use at a live event in an auditorium">
+</p>
+
 ## Controls
 
 - **Program and Preview state.** Program is red, Preview is green, matching the
